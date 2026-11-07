@@ -1,0 +1,45 @@
+{
+  "name": "empiriolabs-chatbot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A streaming AI chatbot built with Next.js, the AI SDK and EmpirioLabs AI.",
+  "license": "MIT",
+  "author": "EmpirioLabs AI <support@empiriolabs.ai> (https://empiriolabs.ai)",
+  "homepage": "https://github.com/EmpirioLabs-AI/empiriolabs-chatbot#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EmpirioLabs-AI/empiriolabs-chatbot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/EmpirioLabs-AI/empiriolabs-chatbot/issues"
+  },
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-sdk/openai-compatible": "3.0.87",
+    "@ai-sdk/react": "4.0.169",
+    "ai": "7.0.165",
+    "next": "16.4.5",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-markdown": "10.1.0",
+    "remark-gfm": "4.0.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.4.5",
+    "typescript": "5.9.3"
+  }
+}

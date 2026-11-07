@@ -1,0 +1,23 @@
+# Dependencies
+/node_modules
+
+# Next.js
+/.next/
+/out/
+next-env.d.ts
+*.tsbuildinfo
+
+# Production
+/build
+
+# Environment variables: only the example is committed
+.env*
+!.env.example
+
+# Deployment platforms
+.vercel
+
+# Logs and system files
+npm-debug.log*
+.DS_Store
+*.pem
