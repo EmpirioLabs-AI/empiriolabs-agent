@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import mark from "@/assets/empiriolabs-ai-mark.png";
 import { chatError, parseChatError, type ChatError, type ChatErrorCode } from "@/lib/errors";
 import { LIMITS } from "@/lib/limits";
+import { toolResultsNote } from "@/lib/tool-output";
 import type { ChatMessage, ChatModel } from "@/lib/types";
 import {
   readVisitorKey,
@@ -25,7 +26,17 @@ import { SiteHeader } from "./site-header";
 
 const BILLING_URL = "https://platform.empiriolabs.ai/dashboard/billing";
 
-const SUGGESTIONS = [
+const TOOL_SUGGESTIONS = [
+  {
+    title: "Generate an image",
+    prompt: "Generate an image of a lighthouse on a rocky coast at sunrise, in watercolor style.",
+  },
+  { title: "Search the web", prompt: "Search the web for today's top AI news headline and cite the source." },
+  { title: "Compare models", prompt: "List three image models with their prices." },
+  { title: "Create a voiceover", prompt: "Turn this into speech: Welcome to EmpirioLabs AI." },
+];
+
+const CHAT_SUGGESTIONS = [
   { title: "Explain a concept", prompt: "Explain how HTTP caching works, with a short example." },
   {
     title: "Write code",
@@ -48,13 +59,16 @@ const RETRYABLE: ChatErrorCode[] = [
 ];
 const KEY_ERRORS: ChatErrorCode[] = ["visitor_key_missing", "visitor_key_rejected", "visitor_key_limit"];
 
-/** Only the text of each message is sent; reasoning stays on the page. */
+/**
+ * Only the text of each message is sent; reasoning and tool results stay on
+ * the page. A reply that made files or left a job running also sends a short
+ * note naming them, so a later message can refer to them.
+ */
 function toRequestMessage(message: ChatMessage) {
-  return {
-    id: message.id,
-    role: message.role,
-    parts: message.parts.flatMap((part) => (part.type === "text" ? [{ type: "text", text: part.text }] : [])),
-  };
+  const parts = message.parts.flatMap((part) => (part.type === "text" ? [{ type: "text", text: part.text }] : []));
+  const note = message.role === "assistant" ? toolResultsNote(message) : null;
+  if (note) parts.push({ type: "text", text: note });
+  return { id: message.id, role: message.role, parts };
 }
 
 function getServerKeySnapshot(): string | null {
@@ -66,6 +80,8 @@ type ChatProps = {
   defaultModelId: string | null;
   initialModelId: string | null;
   demoMode: boolean;
+  /** Whether replies can use EmpirioLabs AI tools (EMPIRIOLABS_TOOLS). */
+  toolsEnabled: boolean;
   setupNeeded: boolean;
   catalogUnavailable: boolean;
 };
@@ -77,6 +93,7 @@ export function Chat({
   defaultModelId,
   initialModelId,
   demoMode,
+  toolsEnabled,
   setupNeeded,
   catalogUnavailable,
 }: ChatProps) {
@@ -299,7 +316,11 @@ export function Chat({
               />
               <div className="empty-state__heading">
                 <h2 className="empty-state__title">How can I help?</h2>
-                <p className="empty-state__subtitle">Chat with text models from the EmpirioLabs AI catalog.</p>
+                <p className="empty-state__subtitle">
+                  {toolsEnabled
+                    ? "Chat with any EmpirioLabs AI model, and create images, video and speech, search the web and more with EmpirioLabs AI tools."
+                    : "Chat with text models from the EmpirioLabs AI catalog."}
+                </p>
               </div>
               {setupNeeded ? (
                 <Notice title="Add an API key to start.">
@@ -334,7 +355,7 @@ export function Chat({
                 </p>
               ) : null}
               <ul className="suggestions" aria-label="Suggestions">
-                {SUGGESTIONS.map((suggestion) => (
+                {(toolsEnabled ? TOOL_SUGGESTIONS : CHAT_SUGGESTIONS).map((suggestion) => (
                   <li key={suggestion.title}>
                     <button
                       type="button"
@@ -421,6 +442,7 @@ export function Chat({
             disabled={!ready}
             models={models}
             modelId={modelId}
+            toolsEnabled={toolsEnabled}
             onModelChange={changeModel}
             textareaRef={textareaRef}
             selectRef={selectRef}

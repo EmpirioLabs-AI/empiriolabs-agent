@@ -1,14 +1,36 @@
 "use client";
 
 import { memo, useEffect, useState } from "react";
+import { readToolOutput, type ToolMedia } from "@/lib/tool-output";
 import type { ChatMessage, ChatModel } from "@/lib/types";
 import { CheckIcon, ChevronRightIcon, CopyIcon } from "./icons";
 import { LazyMarkdown } from "./lazy-markdown";
+import { isToolRunning, ToolCall } from "./tool-call";
+
+type MessagePart = ChatMessage["parts"][number];
 
 export function messageText(message: ChatMessage): string {
   return message.parts
     .flatMap((part) => (part.type === "text" ? [part.text] : []))
     .join("\n\n");
+}
+
+function isShown(part: MessagePart): boolean {
+  if (part.type === "text" || part.type === "reasoning") return part.text.length > 0;
+  return part.type === "dynamic-tool";
+}
+
+/** The files each tool call shows. A file an earlier call in the reply already showed is not repeated. */
+function mediaByToolCall(message: ChatMessage): Map<string, ToolMedia[]> {
+  const shown = new Set<string>();
+  const byCall = new Map<string, ToolMedia[]>();
+  for (const part of message.parts) {
+    if (part.type !== "dynamic-tool" || part.state !== "output-available") continue;
+    const media = (readToolOutput(part.output)?.media ?? []).filter((item) => !shown.has(item.url));
+    for (const item of media) shown.add(item.url);
+    byCall.set(part.toolCallId, media);
+  }
+  return byCall;
 }
 
 type MessageListProps = {
@@ -60,11 +82,15 @@ const MessageItem = memo(function MessageItem({ message, modelName, streaming, o
   }
 
   const text = messageText(message);
-  const hasContent = message.parts.some(
-    (part) => (part.type === "text" || part.type === "reasoning") && part.text.length > 0,
-  );
+  const lastShown = message.parts.findLast(isShown);
   // A reply that failed before any content is shown only as the error below it.
-  if (!streaming && !hasContent) return null;
+  if (!streaming && !lastShown) return null;
+
+  // Between steps, while the model reads a tool's result, nothing else shows progress.
+  const waiting =
+    streaming && (!lastShown || (lastShown.type === "dynamic-tool" && !isToolRunning(lastShown)));
+  const media = mediaByToolCall(message);
+  const finishReason = message.metadata?.finishReason;
 
   return (
     <li className="message message--assistant">
@@ -83,12 +109,27 @@ const MessageItem = memo(function MessageItem({ message, modelName, streaming, o
           if (part.type === "text" && part.text) {
             return <LazyMarkdown key={index} text={part.text} />;
           }
+          if (part.type === "dynamic-tool") {
+            return (
+              <ToolCall
+                key={part.toolCallId}
+                part={part}
+                media={media.get(part.toolCallId) ?? []}
+                streaming={streaming}
+              />
+            );
+          }
           return null;
         })}
-        {streaming && !hasContent ? <TypingIndicator /> : null}
+        {waiting ? <TypingIndicator /> : null}
       </div>
-      {message.metadata?.finishReason === "length" ? (
+      {message.metadata?.toolsUnavailable ? (
+        <p className="message__note">Tools could not be loaded for this reply, so it was written without them.</p>
+      ) : null}
+      {finishReason === "length" ? (
         <p className="message__note">This reply stopped at its length limit.</p>
+      ) : finishReason === "tool-calls" && !streaming ? (
+        <p className="message__note">This reply reached its step limit. Send a message to continue.</p>
       ) : null}
       {!streaming && text ? (
         <div className="message__actions">

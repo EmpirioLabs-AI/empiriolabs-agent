@@ -1,8 +1,8 @@
 {
-  "name": "empiriolabs-chatbot",
+  "name": "empiriolabs-agent",
   "version": "1.0.0",
   "private": true,
-  "description": "A streaming AI chatbot built with Next.js, the AI SDK and EmpirioLabs AI.",
+  "description": "An AI agent built with Next.js, the AI SDK and EmpirioLabs AI: chat with any model and use every EmpirioLabs AI tool.",
   "license": "MIT",
   "author": "EmpirioLabs AI <support@empiriolabs.ai> (https://empiriolabs.ai)",
   "homepage": "https://github.com/EmpirioLabs-AI/empiriolabs-chatbot#readme",
@@ -24,6 +24,7 @@
     "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
+    "@ai-sdk/mcp": "2.0.93",
     "@ai-sdk/openai-compatible": "3.0.87",
     "@ai-sdk/react": "4.0.169",
     "ai": "7.0.165",

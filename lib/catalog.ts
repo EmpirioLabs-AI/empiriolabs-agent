@@ -22,6 +22,9 @@ export type CatalogModel = ChatModel & {
   maxOutputTokens: number | null;
 };
 
+/** The catalog feature of models that call tools. */
+const TOOL_FEATURE = "function_calling";
+
 const entrySchema = z.object({
   id: z.string().min(1),
   display_name: z.string().nullish(),
@@ -31,6 +34,7 @@ const entrySchema = z.object({
   deprecated: z.boolean().nullish(),
   is_featured: z.boolean().nullish(),
   aliases: z.array(z.string()).nullish(),
+  features: z.array(z.string()).nullish(),
   output_modalities: z.array(z.string()).nullish(),
   supported_endpoints: z.array(z.string()).nullish(),
   supported_parameters: z
@@ -66,6 +70,7 @@ function toCatalogModel(raw: unknown, authorNames: Map<string, string>): Catalog
     featured: entry.is_featured === true,
     deprecated: entry.deprecated === true,
     variant: entry.id.includes(":"),
+    tools: (entry.features ?? []).includes(TOOL_FEATURE),
     maxOutputTokens: maxTokens ? (maxTokens.max ?? LIMITS.maxOutputTokens) : null,
   };
 }
@@ -162,6 +167,6 @@ export function pickDefaultModel(
   return configured ?? selectable.find((model) => model.featured) ?? selectable[0];
 }
 
-export function toChatModel({ id, name, author }: CatalogModel): ChatModel {
-  return { id, name, author };
+export function toChatModel({ id, name, author, tools }: CatalogModel): ChatModel {
+  return { id, name, author, tools };
 }

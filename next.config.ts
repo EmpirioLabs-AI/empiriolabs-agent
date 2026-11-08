@@ -1,12 +1,15 @@
 import type { NextConfig } from "next";
+import { MEDIA_ORIGIN } from "./lib/tool-output";
 
-// The page loads scripts, styles and images from its own origin only, and the
-// browser talks to this app alone: model requests go through /api/chat.
+// The page loads scripts and styles from its own origin only, and the browser
+// talks to this app alone: model and tool requests go through /api/chat.
+// Images, video and audio that tools make load from the EmpirioLabs AI media host.
 const contentSecurityPolicy = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  `img-src 'self' data: blob: ${MEDIA_ORIGIN}`,
+  `media-src ${MEDIA_ORIGIN}`,
   "font-src 'self'",
   "connect-src 'self'",
   "object-src 'none'",

@@ -11,8 +11,10 @@ export const LIMITS = {
   maxMessageChars: 32_000,
   /** Characters across the whole conversation. */
   maxConversationChars: 200_000,
-  /** Upper bound on generated tokens per reply, lowered to each model's own maximum. */
+  /** Upper bound on generated tokens per step of a reply, lowered to each model's own maximum. */
   maxOutputTokens: 16_384,
+  /** Model calls in one reply. The agent can use tools between them. */
+  maxSteps: 10,
   /** Chat requests allowed per client IP address in each window, per server instance. */
   rateLimitRequests: 20,
   rateLimitWindowMs: 60_000,

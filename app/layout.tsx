@@ -2,10 +2,10 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "EmpirioLabs AI Chatbot",
+  title: "EmpirioLabs AI Agent",
   description:
-    "A streaming chatbot for the text models in the EmpirioLabs AI catalog, built with Next.js and the AI SDK.",
-  applicationName: "EmpirioLabs AI Chatbot",
+    "An AI agent built with Next.js and the AI SDK: chat with any EmpirioLabs AI model and use every EmpirioLabs AI tool.",
+  applicationName: "EmpirioLabs AI Agent",
 };
 
 export const viewport: Viewport = {

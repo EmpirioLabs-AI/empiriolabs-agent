@@ -15,6 +15,7 @@ type ComposerProps = {
   disabled: boolean;
   models: ChatModel[];
   modelId: string | null;
+  toolsEnabled: boolean;
   onModelChange: (modelId: string) => void;
   textareaRef: RefObject<HTMLTextAreaElement | null>;
   selectRef: Ref<HTMLSelectElement>;
@@ -32,6 +33,7 @@ export function Composer({
   disabled,
   models,
   modelId,
+  toolsEnabled,
   onModelChange,
   textareaRef,
   selectRef,
@@ -97,6 +99,7 @@ export function Composer({
           ref={selectRef}
           models={models}
           value={modelId}
+          markChatOnly={toolsEnabled}
           onChange={onModelChange}
           disabled={disabled}
         />

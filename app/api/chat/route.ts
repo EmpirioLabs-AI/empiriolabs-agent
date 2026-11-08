@@ -1,6 +1,7 @@
 import {
   convertToModelMessages,
   createUIMessageStreamResponse,
+  isStepCount,
   streamText,
   toUIMessageStream,
   type ToolSet,
@@ -10,13 +11,18 @@ import { getCatalogModels, resolveConfiguredModel, selectableModels } from "@/li
 import { getServerConfig } from "@/lib/config";
 import { createEmpirioLabs, describeApiError, logApiFailure } from "@/lib/empiriolabs";
 import { serializeChatError, type ChatErrorCode } from "@/lib/errors";
+import { agentInstructions, WRAP_UP_INSTRUCTION } from "@/lib/instructions";
 import { LIMITS } from "@/lib/limits";
+import { loadAgentTools, logToolsUnavailable, type AgentTools } from "@/lib/mcp";
 import { clientAddress, takeRateLimit } from "@/lib/rate-limit";
 import type { ChatMessage } from "@/lib/types";
 import { VISITOR_KEY_HEADER } from "@/lib/visitor-key";
 
-// Long replies from reasoning models can take minutes.
+// Long replies from reasoning models, and tools that generate video, can take minutes.
 export const maxDuration = 300;
+
+/** After this long, the next step of a reply answers instead of calling more tools. */
+const WRAP_UP_AFTER_MS = (maxDuration - 120) * 1000;
 
 const requestSchema = z.object({
   model: z.string().min(1).max(200),
@@ -149,9 +155,37 @@ export async function POST(request: Request): Promise<Response> {
   const modelId = model.id;
   const empiriolabs = createEmpirioLabs(apiKey);
 
+  // The tools come from the EmpirioLabs AI MCP server's live tool list, with the
+  // same key as the chat. Models that do not call tools answer as plain chat.
+  let agent: AgentTools | undefined;
+  let toolsUnavailable = false;
+  if (config.tools && model.tools) {
+    try {
+      agent = await loadAgentTools(apiKey, request.signal);
+    } catch (error) {
+      if (!request.signal.aborted) {
+        logToolsUnavailable(error);
+        toolsUnavailable = true;
+      }
+    }
+  }
+  const closeTools = () => agent?.close();
+  request.signal.addEventListener("abort", closeTools, { once: true });
+
+  const startedAt = Date.now();
+  const instructions = agent ? agentInstructions(agent.instructions) : undefined;
+
   const result = streamText({
     model: empiriolabs.chatModel(modelId),
+    instructions,
     messages: await convertToModelMessages(conversation),
+    tools: agent?.tools,
+    stopWhen: isStepCount(LIMITS.maxSteps),
+    // The last step, or a reply that has run long, answers instead of calling more tools.
+    prepareStep: ({ stepNumber }) =>
+      instructions && (stepNumber >= LIMITS.maxSteps - 1 || Date.now() - startedAt > WRAP_UP_AFTER_MS)
+        ? { instructions: `${instructions}\n${WRAP_UP_INSTRUCTION}` }
+        : undefined,
     maxOutputTokens:
       model.maxOutputTokens === null ? undefined : Math.min(LIMITS.maxOutputTokens, model.maxOutputTokens),
     // A failed reply is retried by the visitor, never silently by the server.
@@ -162,20 +196,25 @@ export async function POST(request: Request): Promise<Response> {
     onError: ({ error }) => {
       if (!request.signal.aborted) logApiFailure(error, modelId);
     },
+    onEnd: closeTools,
+    onAbort: closeTools,
   });
 
   return createUIMessageStreamResponse({
     stream: toUIMessageStream<ToolSet, ChatMessage>({
       stream: result.stream,
+      tools: agent?.tools,
       sendReasoning: true,
       messageMetadata: ({ part }) => {
-        if (part.type === "start") return { model: modelId };
+        if (part.type === "start") return toolsUnavailable ? { model: modelId, toolsUnavailable } : { model: modelId };
         if (part.type === "finish") return { finishReason: part.finishReason };
         return undefined;
       },
       // A reply the visitor stopped is not a failure.
       onError: (error) =>
         serializeChatError(request.signal.aborted ? "unknown" : describeApiError(error, demoMode)),
+      // Runs when the stream ends for any reason, including an error or a closed tab.
+      onEnd: closeTools,
     }),
   });
 }

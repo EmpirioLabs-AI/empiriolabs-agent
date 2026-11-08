@@ -6,7 +6,7 @@
  */
 export const VISITOR_KEY_HEADER = "x-empiriolabs-api-key";
 
-const STORAGE_KEY = "empiriolabs-chatbot:api-key";
+const STORAGE_KEY = "empiriolabs-agent:api-key";
 
 // Used when sessionStorage is unavailable (some private windows): the key then
 // lasts until the page is closed.

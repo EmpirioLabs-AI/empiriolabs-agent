@@ -15,7 +15,7 @@ export function SiteHeader({ children }: { children?: ReactNode }) {
         loading="eager"
         unoptimized
       />
-      <h1 className="visually-hidden">EmpirioLabs AI Chatbot</h1>
+      <h1 className="visually-hidden">EmpirioLabs AI Agent</h1>
       {children ? <div className="site-header__actions">{children}</div> : null}
     </header>
   );

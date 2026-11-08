@@ -30,6 +30,7 @@ export async function ChatLoader({ searchParams }: { searchParams: PageProps<"/"
         defaultModelId={null}
         initialModelId={null}
         demoMode={config.demoMode}
+        toolsEnabled={config.tools}
         setupNeeded={setupNeeded}
         catalogUnavailable
       />
@@ -47,6 +48,7 @@ export async function ChatLoader({ searchParams }: { searchParams: PageProps<"/"
       defaultModelId={fallback?.id ?? null}
       initialModelId={(fromUrl ?? fallback)?.id ?? null}
       demoMode={config.demoMode}
+      toolsEnabled={config.tools}
       setupNeeded={setupNeeded}
       catalogUnavailable={false}
     />
