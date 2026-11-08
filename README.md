@@ -12,7 +12,7 @@ An AI agent for [EmpirioLabs AI](https://empiriolabs.ai), built with Next.js and
 
 ## Features
 
-- **Every EmpirioLabs AI tool.** A reply can use the tools of the EmpirioLabs AI MCP server: image, video and 3D generation, image editing and analysis, speech, music and sound, transcription, document reading (OCR), web search, research and grounded answers, embeddings and reranking, the model catalog, jobs, agent tasks, batches and account usage. The app reads the server's tool list for every request, so a tool added to the server is available right away.
+- **Every EmpirioLabs AI tool.** A reply can use the tools of the EmpirioLabs AI MCP server: image, video and 3D generation, image editing and analysis, speech, music and sound, transcription, document reading (OCR), web search, research and grounded answers, embeddings and reranking, the model catalog, jobs and agent tasks. The app reads the server's tool list for every request, so a tool added to the server is available right away.
 - **Media in the chat.** Images, video and audio that a tool creates appear in the reply. Each tool call shows as a line, such as **Used** Generate an image, that opens to its input and result.
 - **Live model list.** The model picker reads the EmpirioLabs AI catalog when the page loads and lists its text models by author, so new models appear without a code change. Models that do not call tools are marked "chat only" and answer as a plain chat.
 - **Streaming replies.** Replies stream in as Markdown with lists, tables and code blocks. When a model returns its reasoning, it appears in a section you can expand.
@@ -63,16 +63,16 @@ Open [http://localhost:3000](http://localhost:3000). To run the production build
 
 ## Tools
 
-The agent connects to the `workflows` profile of the [EmpirioLabs AI MCP server](https://docs.empiriolabs.ai/mcp) at `https://mcp.empiriolabs.ai/mcp/workflows`, with the same API key as the chat. This profile serves every EmpirioLabs AI tool except GPU Cloud and Hosted Agents, which you manage from the [dashboard](https://platform.empiriolabs.ai/dashboard), and each tool keeps its normal time limit.
+The agent connects to the [EmpirioLabs AI MCP server](https://docs.empiriolabs.ai/mcp) at `https://mcp.empiriolabs.ai/mcp/models+text+search+media+jobs+agents`, with the same API key as the chat. That address serves the toolsets for the model catalog, text models, search, media, jobs and agent tasks, and each tool keeps its normal time limit. GPU Cloud, Hosted Agents and batches are left out; manage them from the [dashboard](https://platform.empiriolabs.ai/dashboard).
 
-- **What the agent can use.** Every tool in the profile's live tool list, except the tools the server marks as destructive, such as deleting a file or cancelling a job. To change which tools the agent gets, edit `isAllowed` in [`lib/mcp.ts`](lib/mcp.ts).
+- **What the agent can use.** Every tool in that live tool list, except the tools the server marks as destructive, such as deleting a voice or cancelling a job. With the deployment's own key, which every visitor shares, the agent also leaves out the tools that read the account's records (its usage history and its job list). In demo mode, each visitor's own key gets them. To change which tools the agent gets, edit `isAllowed` in [`lib/mcp.ts`](lib/mcp.ts).
 - **Longer work.** A tool that needs more time returns a job, and the agent reads its result with the **Get a job** tool. If a job is still running when a reply ends, the reply gives its job ID; ask the agent to check it later.
 - **Credits.** Tool calls use credits from the account behind the API key, at the prices in the [model catalog](https://empiriolabs.ai/models). The tool definitions also add input tokens to each model call in a reply.
 - **Files.** Generated files use signed links that expire. The page shows images, video and audio only from `https://media.empiriolabs.ai`.
 
 ## Public deployments
 
-Anyone who can open your deployment can use its API key: they can chat, use every tool, including paid image and video generation, and read what the tools return for that account, such as its usage and jobs. Before you share the address, choose one of these:
+Anyone who can open your deployment can use its API key: they can chat and use every tool the agent offers, including paid image and video generation. Before you share the address, choose one of these:
 
 - **Demo mode.** Set `DEMO_MODE=true`. Each visitor enters their own EmpirioLabs AI API key. The key stays in that browser tab (`sessionStorage`) and is sent with each chat request to this app, which uses it for that request only and never stores or logs it.
 - **Your own sign-in.** Put the app behind your authentication.
@@ -119,7 +119,7 @@ const empiriolabs = createOpenAICompatible({
 const mcp = await createMCPClient({
   transport: {
     type: "http",
-    url: "https://mcp.empiriolabs.ai/mcp/workflows",
+    url: "https://mcp.empiriolabs.ai/mcp/models+text+search+media+jobs+agents",
     headers: { Authorization: `Bearer ${apiKey}` },
   },
 });

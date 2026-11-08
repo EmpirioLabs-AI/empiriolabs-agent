@@ -161,7 +161,7 @@ export async function POST(request: Request): Promise<Response> {
   let toolsUnavailable = false;
   if (config.tools && model.tools) {
     try {
-      agent = await loadAgentTools(apiKey, request.signal);
+      agent = await loadAgentTools(apiKey, request.signal, !config.demoMode);
     } catch (error) {
       if (!request.signal.aborted) {
         logToolsUnavailable(error);

@@ -11,12 +11,20 @@ import {
 } from "./tool-output";
 
 /**
- * The EmpirioLabs AI MCP server's `workflows` profile: every EmpirioLabs AI
- * tool except GPU Cloud and Hosted Agents, each with its normal time limit.
- * The tool list is read from the server on every chat request, so tools the
- * server adds appear here without a code change.
+ * The EmpirioLabs AI MCP server with these toolsets: the model catalog, text
+ * models, search, media, jobs and agent tasks, each tool with its normal time
+ * limit. GPU Cloud, Hosted Agents and batches are left out. The tool list is
+ * read from the server on every chat request, so tools the server adds to
+ * these toolsets appear here without a code change.
  */
-export const MCP_URL = "https://mcp.empiriolabs.ai/mcp/workflows";
+export const MCP_URL = "https://mcp.empiriolabs.ai/mcp/models+text+search+media+jobs+agents";
+
+/**
+ * Tools that read the account's own records. When every visitor shares the
+ * deployment's key, they are left out, so one visitor cannot read the usage
+ * history or the job list that other visitors' requests made.
+ */
+const ACCOUNT_RECORD_TOOLS = new Set(["get_account_usage", "list_jobs"]);
 
 /** Time allowed to connect and to read the tool list. */
 const CONNECT_TIMEOUT_MS = 15_000;
@@ -36,21 +44,24 @@ export type AgentTools = {
 type ToolDefinition = Awaited<ReturnType<MCPClient["listTools"]>>["tools"][number];
 
 /**
- * The one rule for leaving a tool out: the server marks it destructive, as it
- * does for deleting, cancelling and stopping. The agent calls tools without
- * asking first, and the web pages and documents it reads can contain
- * instructions, so it never makes a change that cannot be undone.
+ * Leaves out the tools the server marks destructive, as it does for deleting,
+ * cancelling and stopping: the agent calls tools without asking first, and the
+ * web pages and documents it reads can contain instructions, so it never makes
+ * a change that cannot be undone. With a shared key, it also leaves out the
+ * tools that read the account's records.
  */
-function isAllowed(definition: ToolDefinition): boolean {
-  return definition.annotations?.destructiveHint !== true;
+function isAllowed(definition: ToolDefinition, sharedKey: boolean): boolean {
+  if (definition.annotations?.destructiveHint === true) return false;
+  return !(sharedKey && ACCOUNT_RECORD_TOOLS.has(definition.name));
 }
 
 /**
  * Connects to the EmpirioLabs AI MCP server with the API key that serves this
- * chat request, and returns its tools for `streamText`. Close the connection
- * when the reply ends.
+ * chat request, and returns its tools for `streamText`. `sharedKey` is true
+ * when the key is the deployment's own, which every visitor shares. Close the
+ * connection when the reply ends.
  */
-export async function loadAgentTools(apiKey: string, signal: AbortSignal): Promise<AgentTools> {
+export async function loadAgentTools(apiKey: string, signal: AbortSignal, sharedKey: boolean): Promise<AgentTools> {
   const client = await createMCPClient({
     transport: {
       type: "http",
@@ -86,7 +97,9 @@ export async function loadAgentTools(apiKey: string, signal: AbortSignal): Promi
     }
 
     const tools: ToolSet = {};
-    const mcpTools = client.toolsFromDefinitions({ tools: definitions.filter(isAllowed) });
+    const mcpTools = client.toolsFromDefinitions({
+      tools: definitions.filter((definition) => isAllowed(definition, sharedKey)),
+    });
     for (const [name, tool] of Object.entries(mcpTools)) {
       tools[name] = {
         ...tool,
