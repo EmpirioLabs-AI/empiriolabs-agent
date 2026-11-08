@@ -3,7 +3,7 @@
 An AI agent for [EmpirioLabs AI](https://empiriolabs.ai), built with Next.js and the AI SDK. Chat with any model in the live EmpirioLabs AI catalog, and let the agent use every EmpirioLabs AI tool: generate images, video, 3D assets, speech and music, transcribe audio, read documents, search the web, compare models, run agent tasks and more. The tools come from the live tool list of the EmpirioLabs AI MCP server, so new tools appear without a code change.
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FEmpirioLabs-AI%2Fempiriolabs-agent&project-name=empiriolabs-agent&repository-name=empiriolabs-agent&integration-ids=oac_G0yRAQMkKnlHKtLYN9aNXLSD&skippable-integrations=1)
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/empiriolabs-ai-chatbot?referralCode=FR-gwI&utm_medium=integration&utm_source=template&utm_campaign=generic)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/empiriolabs-ai-agent?referralCode=FR-gwI&utm_medium=integration&utm_source=template&utm_campaign=generic)
 
 <p>
   <img src=".github/screenshots/desktop.png" alt="EmpirioLabs AI Agent on a desktop screen: GLM 5.3 Flash used the Generate an image tool and shows a watercolor painting of a lighthouse at sunrise" width="70%">
