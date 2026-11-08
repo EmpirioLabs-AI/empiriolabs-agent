@@ -54,18 +54,22 @@ export function logApiFailure(error: unknown, model: string): void {
   console.error("Chat reply failed:", JSON.stringify({ model, status, code, requestId }));
 }
 
-/** Maps an error from the EmpirioLabs AI API to what the visitor sees. */
-export function describeApiError(error: unknown, demoMode: boolean): ChatErrorCode {
+/**
+ * Maps an error from the EmpirioLabs AI API to what the visitor sees.
+ * `signedIn` is true when the request used the visitor's own access token: a
+ * 401 then means the visitor disconnected the app, or the token was revoked.
+ */
+export function describeApiError(error: unknown, signedIn: boolean): ChatErrorCode {
   const { status, code } = readFailure(error);
 
   if (status === 401 || code === "invalid_api_key" || code === "missing_api_key") {
-    return demoMode ? "visitor_key_rejected" : "server_key_rejected";
+    return signedIn ? "session_ended" : "server_key_rejected";
   }
   if (code === "spending_limit_reached") {
-    return demoMode ? "visitor_key_limit" : "server_key_limit";
+    return signedIn ? "account_limit" : "server_key_limit";
   }
   if (status === 402 || code === "insufficient_credits") {
-    return demoMode ? "visitor_credits" : "server_credits";
+    return signedIn ? "account_credits" : "server_credits";
   }
   if (code === "context_length_exceeded") return "context_too_long";
   if (status === 403) return "model_forbidden";

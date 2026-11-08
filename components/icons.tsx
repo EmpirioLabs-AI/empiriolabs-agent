@@ -48,13 +48,12 @@ export function PlusIcon(props: IconProps) {
   );
 }
 
-export function KeyIcon(props: IconProps) {
+export function SignOutIcon(props: IconProps) {
   return (
     <Icon {...props}>
-      <circle cx="7.5" cy="15.5" r="4.5" />
-      <path d="m10.7 12.3 9.3-9.3" />
-      <path d="m16 7 3 3" />
-      <path d="m18.5 4.5 2 2" />
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <path d="m16 17 5-5-5-5" />
+      <path d="M21 12H9" />
     </Icon>
   );
 }

@@ -6,17 +6,19 @@ import {
   toUIMessageStream,
   type ToolSet,
 } from "ai";
+import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { getCatalogModels, resolveConfiguredModel, selectableModels } from "@/lib/catalog";
 import { getServerConfig } from "@/lib/config";
+import { isCrossSite } from "@/lib/cross-site";
 import { createEmpirioLabs, describeApiError, logApiFailure } from "@/lib/empiriolabs";
 import { serializeChatError, type ChatErrorCode } from "@/lib/errors";
 import { agentInstructions, WRAP_UP_INSTRUCTION } from "@/lib/instructions";
 import { LIMITS } from "@/lib/limits";
 import { loadAgentTools, logToolsUnavailable, type AgentTools } from "@/lib/mcp";
 import { clientAddress, takeRateLimit } from "@/lib/rate-limit";
+import { readSessionToken, SESSION_COOKIE } from "@/lib/session";
 import type { ChatMessage } from "@/lib/types";
-import { VISITOR_KEY_HEADER } from "@/lib/visitor-key";
 
 // Long replies from reasoning models, and tools that generate video, can take minutes.
 export const maxDuration = 300;
@@ -43,25 +45,6 @@ function fail(code: ChatErrorCode, status: number, headers?: HeadersInit): Respo
     status,
     headers: { "content-type": "application/json", "cache-control": "no-store", ...headers },
   });
-}
-
-/**
- * Refuses a browser request sent from another site, so other pages cannot use
- * this app's key. Browsers set Sec-Fetch-Site themselves; Origin and Host are
- * the fallback for browsers that do not.
- */
-function isCrossSite(request: Request): boolean {
-  const fetchSite = request.headers.get("sec-fetch-site");
-  if (fetchSite) return fetchSite !== "same-origin";
-
-  const origin = request.headers.get("origin");
-  if (!origin) return false;
-  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
-  try {
-    return new URL(origin).host !== host;
-  } catch {
-    return true;
-  }
 }
 
 /** Reads the body as JSON, refusing anything larger than the limit. */
@@ -93,22 +76,21 @@ async function readJson(request: Request): Promise<unknown> {
   return JSON.parse(new TextDecoder().decode(bytes));
 }
 
-export async function POST(request: Request): Promise<Response> {
+export async function POST(request: NextRequest): Promise<Response> {
   if (isCrossSite(request)) return fail("cross_site", 403);
 
   const waitSeconds = takeRateLimit(clientAddress(request));
   if (waitSeconds > 0) return fail("rate_limited", 429, { "retry-after": String(waitSeconds) });
 
+  // Sign-in mode uses the visitor's own access token, from the HttpOnly cookie
+  // that sign-in set. Server-key mode uses the deployment's key, which every
+  // visitor shares.
   const config = getServerConfig();
-  let apiKey: string | undefined;
-  if (config.demoMode) {
-    apiKey = request.headers.get(VISITOR_KEY_HEADER)?.trim();
-    if (!apiKey) return fail("visitor_key_missing", 401);
-    if (apiKey.length > 512 || !/^[\x21-\x7e]+$/.test(apiKey)) return fail("visitor_key_rejected", 401);
-  } else {
-    apiKey = config.apiKey;
-    if (!apiKey) return fail("server_key_missing", 503);
-  }
+  const signedIn = config.signInMode;
+  const apiKey = config.signInMode
+    ? readSessionToken(request.cookies.get(SESSION_COOKIE)?.value)
+    : config.apiKey;
+  if (!apiKey) return fail("sign_in_required", 401);
 
   // The model list is needed below; start loading it now so it overlaps reading the body.
   const modelsPromise = getCatalogModels();
@@ -151,17 +133,17 @@ export async function POST(request: Request): Promise<Response> {
   }
   if (!model) return fail("model_unavailable", 400);
 
-  const demoMode = config.demoMode;
   const modelId = model.id;
   const empiriolabs = createEmpirioLabs(apiKey);
 
   // The tools come from the EmpirioLabs AI MCP server's live tool list, with the
   // same key as the chat. Models that do not call tools answer as plain chat.
+  // A visitor's own key is not shared, so it also gets the account record tools.
   let agent: AgentTools | undefined;
   let toolsUnavailable = false;
   if (config.tools && model.tools) {
     try {
-      agent = await loadAgentTools(apiKey, request.signal, !config.demoMode);
+      agent = await loadAgentTools(apiKey, request.signal, !signedIn);
     } catch (error) {
       if (!request.signal.aborted) {
         logToolsUnavailable(error);
@@ -210,9 +192,10 @@ export async function POST(request: Request): Promise<Response> {
         if (part.type === "finish") return { finishReason: part.finishReason };
         return undefined;
       },
-      // A reply the visitor stopped is not a failure.
+      // A reply the visitor stopped is not a failure. A visitor whose sign-in no
+      // longer works gets session_ended, and the page then clears the cookie.
       onError: (error) =>
-        serializeChatError(request.signal.aborted ? "unknown" : describeApiError(error, demoMode)),
+        serializeChatError(request.signal.aborted ? "unknown" : describeApiError(error, signedIn)),
       // Runs when the stream ends for any reason, including an error or a closed tab.
       onEnd: closeTools,
     }),

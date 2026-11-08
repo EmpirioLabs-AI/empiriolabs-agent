@@ -4,24 +4,20 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import mark from "@/assets/empiriolabs-ai-mark.png";
+import { saveDraft, takeDraft } from "@/lib/draft";
 import { chatError, parseChatError, type ChatError, type ChatErrorCode } from "@/lib/errors";
 import { LIMITS } from "@/lib/limits";
+import { SIGN_IN_PARAM, SIGN_OUT_PATH, signInNotice, type SignInOutcome } from "@/lib/sign-in";
 import { toolResultsNote } from "@/lib/tool-output";
 import type { ChatMessage, ChatModel } from "@/lib/types";
-import {
-  readVisitorKey,
-  subscribeVisitorKey,
-  VISITOR_KEY_HEADER,
-  writeVisitorKey,
-} from "@/lib/visitor-key";
-import { API_KEYS_URL, ApiKeyDialog } from "./api-key-dialog";
 import { Composer } from "./composer";
-import { CheckIcon, KeyIcon, PlusIcon, RetryIcon } from "./icons";
+import { PlusIcon, RetryIcon, SignOutIcon } from "./icons";
 import { preloadMarkdown } from "./lazy-markdown";
 import { MessageList, messageText, TypingIndicator } from "./message-list";
 import { Notice } from "./notice";
+import { SignInLink } from "./sign-in-link";
 import { SiteHeader } from "./site-header";
 
 const BILLING_URL = "https://platform.empiriolabs.ai/dashboard/billing";
@@ -52,12 +48,12 @@ const RETRYABLE: ChatErrorCode[] = [
   "network",
   "unknown",
   "catalog_unavailable",
-  "visitor_credits",
+  "account_credits",
   "server_credits",
-  "visitor_key_limit",
+  "account_limit",
   "server_key_limit",
 ];
-const KEY_ERRORS: ChatErrorCode[] = ["visitor_key_missing", "visitor_key_rejected", "visitor_key_limit"];
+const SIGN_IN_ERRORS: ChatErrorCode[] = ["sign_in_required", "session_ended"];
 
 /**
  * Only the text of each message is sent; reasoning and tool results stay on
@@ -71,37 +67,39 @@ function toRequestMessage(message: ChatMessage) {
   return { id: message.id, role: message.role, parts };
 }
 
-function getServerKeySnapshot(): string | null {
-  return null;
-}
-
 type ChatProps = {
   models: ChatModel[];
   defaultModelId: string | null;
   initialModelId: string | null;
-  demoMode: boolean;
   /** Whether replies can use EmpirioLabs AI tools (EMPIRIOLABS_TOOLS). */
   toolsEnabled: boolean;
-  setupNeeded: boolean;
   catalogUnavailable: boolean;
+  /** Sign-in mode: each visitor signs in with their EmpirioLabs AI account. */
+  signInMode: boolean;
+  /** In sign-in mode, whether this visitor was signed in when the page loaded. */
+  signedIn: boolean;
+  /** Where the Sign In links point. */
+  signInHref: string;
+  /** A sign-in that did not complete, reported by the sign-in routes in the address. */
+  signInOutcome: SignInOutcome | null;
 };
-
-type Pending = { text: string; fromInput: boolean };
 
 export function Chat({
   models,
   defaultModelId,
   initialModelId,
-  demoMode,
   toolsEnabled,
-  setupNeeded,
   catalogUnavailable,
+  signInMode,
+  signedIn: initialSignedIn,
+  signInHref,
+  signInOutcome,
 }: ChatProps) {
   const router = useRouter();
   const [modelId, setModelId] = useState(initialModelId);
   const [input, setInput] = useState("");
-  const [keyDialogOpen, setKeyDialogOpen] = useState(false);
-  const [pending, setPending] = useState<Pending | null>(null);
+  const [signedIn, setSignedIn] = useState(initialSignedIn);
+  const [signingOut, setSigningOut] = useState(false);
   const [localError, setLocalError] = useState<ChatError | null>(null);
   const [clearedMessages, setClearedMessages] = useState<ChatMessage[] | null>(null);
   const [announcement, setAnnouncement] = useState("");
@@ -109,14 +107,13 @@ export function Chat({
   const selectRef = useRef<HTMLSelectElement>(null);
   const followReply = useRef(true);
 
-  const visitorKey = useSyncExternalStore(subscribeVisitorKey, readVisitorKey, getServerKeySnapshot);
-
   // Repeating the same words would not be read out again, so alternate a trailing no-break space.
   const announce = useCallback((text: string) => {
     setAnnouncement((previous) => (previous === text ? `${text}\u00a0` : text));
   }, []);
   const announceCopied = useCallback(() => announce("Reply copied."), [announce]);
 
+  // The session cookie goes with each request on its own; the page never sees the access token.
   const [transport] = useState(
     () =>
       new DefaultChatTransport<ChatMessage>({
@@ -135,18 +132,26 @@ export function Chat({
       onFinish: ({ isAbort, isError }) => {
         if (!isAbort && !isError) announce("Reply finished.");
       },
-      // A key the API refused is forgotten, so the page asks for a new one.
+      // A sign-in that no longer works ends here: the page asks the visitor to
+      // sign in again, and its cookie is cleared (and the token revoked, which
+      // changes nothing when it was already disconnected).
       onError: (chatFailure) => {
-        if (parseChatError(chatFailure).code === "visitor_key_rejected") writeVisitorKey(null);
+        const { code } = parseChatError(chatFailure);
+        if (!SIGN_IN_ERRORS.includes(code)) return;
+        setSignedIn(false);
+        if (code === "session_ended") {
+          void fetch(SIGN_OUT_PATH, { method: "POST" }).catch(() => undefined);
+        }
       },
     });
 
   const busy = status === "submitted" || status === "streaming";
   const noModels = catalogUnavailable || models.length === 0;
-  const ready = !setupNeeded && !noModels && modelId !== null;
-  const needsVisitorKey = demoMode && !visitorKey;
+  const ready = !noModels && modelId !== null;
+  const needsSignIn = signInMode && !signedIn;
   const modelsById = useMemo(() => new Map(models.map((model) => [model.id, model])), [models]);
   const shownError = localError ?? (error ? parseChatError(error) : null);
+  const notice = needsSignIn && signInOutcome ? signInNotice(signInOutcome) : null;
 
   // Follow a reply while it streams, unless the visitor scrolled up to read.
   useEffect(() => {
@@ -177,15 +182,31 @@ export function Chat({
     return () => clearTimeout(timer);
   }, []);
 
-  function requestOptions(key: string | null) {
-    return {
-      body: { model: modelId },
-      headers: demoMode && key ? { [VISITOR_KEY_HEADER]: key } : undefined,
-    };
+  // A message and a model chosen before signing in are back in place afterwards.
+  const restoreDraft = useEffectEvent(() => {
+    const draft = takeDraft();
+    if (!draft) return;
+    if (draft.model && draft.model !== modelId && modelsById.has(draft.model)) changeModel(draft.model);
+    if (draft.text) setInput((current) => current || draft.text);
+  });
+
+  useEffect(() => {
+    // A sign-in outcome shows once: a reload or a shared link does not repeat it.
+    const url = new URL(window.location.href);
+    if (url.searchParams.has(SIGN_IN_PARAM)) {
+      url.searchParams.delete(SIGN_IN_PARAM);
+      window.history.replaceState(null, "", url);
+    }
+    const frame = window.requestAnimationFrame(() => restoreDraft());
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  function requestOptions() {
+    return { body: { model: modelId } };
   }
 
   /** Sends a message after the limits check. Returns false when it was not sent. */
-  function dispatch(text: string, key: string | null): boolean {
+  function dispatch(text: string): boolean {
     if (text.length > LIMITS.maxMessageChars) {
       setLocalError(chatError("message_too_long"));
       return false;
@@ -201,49 +222,52 @@ export function Chat({
     setLocalError(null);
     setClearedMessages(null);
     followReply.current = true;
-    void sendMessage({ text }, requestOptions(key));
+    void sendMessage({ text }, requestOptions());
     return true;
+  }
+
+  /** Keeps a message and the chosen model in this tab for when the visitor comes back from signing in. */
+  function rememberDraft(text: string) {
+    saveDraft({ text, model: modelId });
   }
 
   function submit(text: string, fromInput: boolean) {
     const trimmed = text.trim();
     if (!trimmed || busy || !ready) return;
-    if (needsVisitorKey) {
-      setPending({ text: trimmed, fromInput });
-      setKeyDialogOpen(true);
+    // Signed out: the message waits in this tab while the visitor signs in.
+    if (needsSignIn) {
+      rememberDraft(trimmed);
+      window.location.assign(signInHref);
       return;
     }
-    if (dispatch(trimmed, visitorKey) && fromInput) setInput("");
+    if (dispatch(trimmed) && fromInput) setInput("");
   }
 
-  function retry(key: string | null = visitorKey) {
+  function retry() {
     setLocalError(null);
     followReply.current = true;
-    void regenerate(requestOptions(key));
+    void regenerate(requestOptions());
   }
 
-  function saveKey(key: string) {
-    writeVisitorKey(key);
-    setKeyDialogOpen(false);
-    announce("API key saved.");
-    if (pending) {
-      setPending(null);
-      if (dispatch(pending.text, key) && pending.fromInput) setInput("");
-    } else if (shownError && KEY_ERRORS.includes(shownError.code) && messages.length > 0) {
-      retry(key);
+  async function signOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      if (busy) await stop();
+      const response = await fetch(SIGN_OUT_PATH, { method: "POST" });
+      if (!response.ok) throw new Error(`Sign-out answered ${response.status}.`);
+      setSignedIn(false);
+      setMessages([]);
+      setClearedMessages(null);
+      clearError();
+      setLocalError(null);
+      announce("Signed out.");
+      textareaRef.current?.focus();
+    } catch {
+      setLocalError(chatError("sign_out_failed"));
+    } finally {
+      setSigningOut(false);
     }
-  }
-
-  function removeKey() {
-    writeVisitorKey(null);
-    setKeyDialogOpen(false);
-    setPending(null);
-    announce("API key removed.");
-  }
-
-  function closeKeyDialog() {
-    setKeyDialogOpen(false);
-    setPending(null);
   }
 
   async function newChat() {
@@ -276,6 +300,9 @@ export function Chat({
 
   const lastMessage = messages.at(-1);
   const waitingModel = modelId ? (modelsById.get(modelId)?.name ?? modelId) : "Assistant";
+  // After a sign-in ends mid-chat, the last message returns as the draft.
+  const lastUserMessage = messages.findLast((message) => message.role === "user");
+  const draftAfterSignIn = input.trim() ? input : lastUserMessage ? messageText(lastUserMessage) : "";
 
   return (
     <>
@@ -283,17 +310,19 @@ export function Chat({
         Skip to the message box
       </a>
       <SiteHeader>
-        {demoMode ? (
+        {signInMode && signedIn ? (
           <button
             type="button"
             className="header-button"
-            onClick={() => setKeyDialogOpen(true)}
-            aria-haspopup="dialog"
+            onClick={() => void signOut()}
+            aria-disabled={signingOut || undefined}
           >
-            {visitorKey ? <CheckIcon /> : <KeyIcon />}
-            <span>API Key</span>
-            {visitorKey ? <span className="visually-hidden">(added)</span> : null}
+            <SignOutIcon />
+            <span>Sign Out</span>
           </button>
+        ) : null}
+        {needsSignIn ? (
+          <SignInLink className="header-button" href={signInHref} onClick={() => rememberDraft(input)} />
         ) : null}
         <button type="button" className="header-button" onClick={newChat}>
           <PlusIcon />
@@ -322,15 +351,7 @@ export function Chat({
                     : "Chat with text models from the EmpirioLabs AI catalog."}
                 </p>
               </div>
-              {setupNeeded ? (
-                <Notice title="Add an API key to start.">
-                  Set <code>EMPIRIOLABS_API_KEY</code> in this app&apos;s environment variables, then
-                  redeploy.{" "}
-                  <a href={API_KEYS_URL} target="_blank" rel="noopener noreferrer">
-                    Get an API key
-                  </a>
-                </Notice>
-              ) : noModels ? (
+              {noModels ? (
                 <Notice title="Models could not be loaded.">
                   Check the connection, then{" "}
                   <button type="button" className="link-button" onClick={() => router.refresh()}>
@@ -338,13 +359,17 @@ export function Chat({
                   </button>
                   .
                 </Notice>
-              ) : needsVisitorKey ? (
-                <Notice title="Add your API key to start.">
-                  This demo runs on your own EmpirioLabs AI API key.{" "}
-                  <button type="button" className="link-button" onClick={() => setKeyDialogOpen(true)}>
-                    Add API Key
-                  </button>
-                </Notice>
+              ) : needsSignIn ? (
+                <div className="sign-in-prompt">
+                  {notice ? <Notice title={notice.title}>{notice.text}</Notice> : null}
+                  <p className="sign-in-prompt__text">Sign in with your EmpirioLabs AI account to start.</p>
+                  <SignInLink
+                    className="button brand-button"
+                    href={signInHref}
+                    onClick={() => rememberDraft(input)}
+                    markSize={18}
+                  />
+                </div>
               ) : null}
               {clearedMessages ? (
                 <p className="empty-state__cleared">
@@ -391,21 +416,20 @@ export function Chat({
               <p className="alert__text">{shownError.message}</p>
               <div className="alert__actions">
                 {RETRYABLE.includes(shownError.code) && messages.length > 0 ? (
-                  <button type="button" className="button button--small" onClick={() => retry()}>
+                  <button type="button" className="button button--small" onClick={retry}>
                     <RetryIcon width={14} height={14} />
                     Try Again
                   </button>
                 ) : null}
-                {KEY_ERRORS.includes(shownError.code) ? (
-                  <button
-                    type="button"
+                {SIGN_IN_ERRORS.includes(shownError.code) && signInMode ? (
+                  <SignInLink
                     className="button button--small"
-                    onClick={() => setKeyDialogOpen(true)}
-                  >
-                    Update API Key
-                  </button>
+                    href={signInHref}
+                    onClick={() => rememberDraft(draftAfterSignIn)}
+                    markSize={14}
+                  />
                 ) : null}
-                {shownError.code === "visitor_credits" ? (
+                {shownError.code === "account_credits" ? (
                   <a className="button button--small" href={BILLING_URL} target="_blank" rel="noopener noreferrer">
                     Add Credits
                   </a>
@@ -454,16 +478,6 @@ export function Chat({
       <div className="visually-hidden" role="status" aria-live="polite">
         {announcement}
       </div>
-
-      {demoMode ? (
-        <ApiKeyDialog
-          open={keyDialogOpen}
-          hasKey={Boolean(visitorKey)}
-          onSave={saveKey}
-          onRemove={removeKey}
-          onClose={closeKeyDialog}
-        />
-      ) : null}
     </>
   );
 }

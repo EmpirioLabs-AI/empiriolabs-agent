@@ -1,17 +1,15 @@
 import { LIMITS } from "./limits";
 
 const MESSAGES = {
-  server_key_missing:
-    "This app needs an EmpirioLabs AI API key. Set EMPIRIOLABS_API_KEY, then redeploy.",
   server_key_rejected:
     "The app's API key was not accepted. Check EMPIRIOLABS_API_KEY, then redeploy.",
-  visitor_key_missing: "Add your EmpirioLabs AI API key to send a message.",
-  visitor_key_rejected: "Your API key was not accepted. Check it, then try again.",
+  sign_in_required: "Sign in with your EmpirioLabs AI account to send a message.",
+  session_ended: "You have been signed out. Sign in again to continue.",
+  sign_out_failed: "Sign-out did not complete. Try again.",
   server_credits: "The EmpirioLabs AI account behind this app is out of credits.",
-  visitor_credits: "Your EmpirioLabs AI account is out of credits. Add credits, then try again.",
+  account_credits: "Your EmpirioLabs AI account is out of credits. Add credits, then try again.",
   server_key_limit: "The app's API key has reached its spending limit.",
-  visitor_key_limit:
-    "Your API key has reached its spending limit. Raise the limit or use another key, then try again.",
+  account_limit: "Your EmpirioLabs AI account has reached a spending limit.",
   model_forbidden:
     "This account cannot use the selected model. Choose another model, or contact EmpirioLabs AI support if this continues.",
   model_unavailable: "The selected model is not available. Choose another model.",
@@ -24,7 +22,7 @@ const MESSAGES = {
   conversation_too_long: "This chat is too long to continue. Start a new chat.",
   bad_request: "The message could not be sent. Reload the page and try again.",
   catalog_unavailable: "Models could not be loaded. Try again in a moment.",
-  cross_site: "This app only accepts messages sent from its own pages.",
+  cross_site: "This app only accepts requests sent from its own pages.",
   network: "The reply could not load. Check your connection, then try again.",
   unknown: "Something went wrong. Try again.",
 } as const;

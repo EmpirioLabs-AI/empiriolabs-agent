@@ -15,7 +15,10 @@ export const LIMITS = {
   maxOutputTokens: 16_384,
   /** Model calls in one reply. The agent can use tools between them. */
   maxSteps: 10,
-  /** Chat requests allowed per client IP address in each window, per server instance. */
+  /**
+   * Chat requests allowed per client IP address in each window, per server
+   * instance. Sign-in returns and sign-outs are counted apart, with the same limit.
+   */
   rateLimitRequests: 20,
   rateLimitWindowMs: 60_000,
 } as const;
