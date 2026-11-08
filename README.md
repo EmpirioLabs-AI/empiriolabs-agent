@@ -3,8 +3,7 @@
 A streaming chatbot for the text models in the [EmpirioLabs AI](https://empiriolabs.ai) catalog, built with Next.js and the AI SDK. Choose a model from the live catalog, read replies as they stream in as Markdown, and deploy your own copy to Vercel or Railway.
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FEmpirioLabs-AI%2Fempiriolabs-chatbot&project-name=empiriolabs-chatbot&repository-name=empiriolabs-chatbot&integration-ids=oac_G0yRAQMkKnlHKtLYN9aNXLSD&skippable-integrations=1)
-<!-- Railway: replace RAILWAY_TEMPLATE_CODE with the template's code once the Railway template is published. -->
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template/RAILWAY_TEMPLATE_CODE?utm_medium=integration&utm_source=button&utm_campaign=empiriolabs-chatbot)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/WjXESq?referralCode=FR-gwI&utm_medium=integration&utm_source=template&utm_campaign=generic)
 
 <p>
   <img src=".github/screenshots/desktop.png" alt="EmpirioLabs AI Chatbot on a desktop screen, showing a Python function and its explanation from GLM 5.3 Flash" width="70%">
