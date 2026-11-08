@@ -12,6 +12,7 @@ import { LIMITS } from "@/lib/limits";
 import { SIGN_IN_PARAM, SIGN_OUT_PATH, signInNotice, type SignInOutcome } from "@/lib/sign-in";
 import { toolResultsNote } from "@/lib/tool-output";
 import type { ChatMessage, ChatModel } from "@/lib/types";
+import { ApiKeyOption } from "./api-key-option";
 import { Composer } from "./composer";
 import { PlusIcon, RetryIcon, SignOutIcon } from "./icons";
 import { preloadMarkdown } from "./lazy-markdown";
@@ -106,6 +107,9 @@ export function Chat({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const selectRef = useRef<HTMLSelectElement>(null);
   const followReply = useRef(true);
+  // Clearing a sign-in that stopped working, while that request runs. A key
+  // entered meanwhile waits for it, so the new cookie is not cleared after it is set.
+  const endingSession = useRef<Promise<unknown> | null>(null);
 
   // Repeating the same words would not be read out again, so alternate a trailing no-break space.
   const announce = useCallback((text: string) => {
@@ -140,7 +144,7 @@ export function Chat({
         if (!SIGN_IN_ERRORS.includes(code)) return;
         setSignedIn(false);
         if (code === "session_ended") {
-          void fetch(SIGN_OUT_PATH, { method: "POST" }).catch(() => undefined);
+          endingSession.current = fetch(SIGN_OUT_PATH, { method: "POST", keepalive: true }).catch(() => undefined);
         }
       },
     });
@@ -248,6 +252,18 @@ export function Chat({
     setLocalError(null);
     followReply.current = true;
     void regenerate(requestOptions());
+  }
+
+  /**
+   * A visitor who continued with an API key is signed in without leaving the
+   * page: the server set the cookie, so the header changes to Sign Out here,
+   * and a reply that failed because they were signed out is sent again.
+   */
+  function continueWithKey() {
+    setSignedIn(true);
+    announce("Signed in with your API key.");
+    if (shownError && SIGN_IN_ERRORS.includes(shownError.code) && messages.length > 0) retry();
+    else textareaRef.current?.focus();
   }
 
   async function signOut() {
@@ -370,6 +386,7 @@ export function Chat({
                     onClick={() => rememberDraft(input)}
                     markSize={18}
                   />
+                  <ApiKeyOption onSignedIn={continueWithKey} beforeSubmit={() => endingSession.current} />
                 </div>
               ) : null}
               {clearedMessages ? (
@@ -451,6 +468,15 @@ export function Chat({
                 ) : null}
               </div>
             </div>
+          ) : null}
+
+          {/* Signed out mid-chat: an API key continues on this page, so the conversation stays. */}
+          {shownError && needsSignIn && SIGN_IN_ERRORS.includes(shownError.code) && messages.length > 0 ? (
+            <ApiKeyOption
+              className="api-key-option--after-alert"
+              onSignedIn={continueWithKey}
+              beforeSubmit={() => endingSession.current}
+            />
           ) : null}
         </section>
 

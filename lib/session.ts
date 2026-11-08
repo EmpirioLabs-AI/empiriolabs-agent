@@ -5,14 +5,23 @@ import { isAccessToken } from "./oauth";
 import { SIGN_IN_PARAM, type SignInOutcome } from "./sign-in";
 
 /**
- * The visitor's access token, after they sign in. HttpOnly, so the page's
- * scripts cannot read it, and kept for 30 days, so a returning visitor uses the
- * same connection instead of adding a new one under Settings > Connected
- * applications each time. Sign Out revokes it. Only the server reads it, to
- * call EmpirioLabs AI for the visitor.
+ * The visitor's access token after they sign in, or the API key they entered
+ * instead. HttpOnly, so the page's scripts cannot read it, and kept for 30
+ * days, so a returning visitor uses the same connection instead of adding a
+ * new one under Settings > Connected applications each time. Only the server
+ * reads it, to call EmpirioLabs AI for the visitor.
  */
 export const SESSION_COOKIE = "empiriolabs_session";
+
+/**
+ * Where the session cookie's value came from: `oauth` for an access token this
+ * app received, which Sign Out revokes, or `key` for an API key the visitor
+ * entered, which Sign Out only forgets. A session without it came from OAuth.
+ */
+const SESSION_SOURCE_COOKIE = "empiriolabs_session_source";
 const SESSION_COOKIE_MAX_AGE = 30 * 24 * 60 * 60;
+
+export type SessionSource = "oauth" | "key";
 
 /** The `state` and PKCE `code_verifier` of a sign-in in progress, sent only to the sign-in routes for ten minutes. */
 const SIGN_IN_COOKIE = "empiriolabs_sign_in";
@@ -22,30 +31,32 @@ const SIGN_IN_COOKIE_MAX_AGE = 600;
 /** Every sign-in response is private to the visitor and never stored by a cache. */
 const NO_STORE = { "cache-control": "no-store" };
 
-/** The visitor's access token, from the session cookie's value. */
+/** The visitor's access token or API key, from the session cookie's value. */
 export function readSessionToken(value: string | undefined): string | null {
   return value && isAccessToken(value) ? value : null;
 }
 
-export function setSessionCookie(response: NextResponse, token: string, secure: boolean): void {
-  response.cookies.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    secure,
-    sameSite: "lax",
-    path: "/",
-    maxAge: SESSION_COOKIE_MAX_AGE,
-  });
+/** How the visitor signed in, from the source cookie's value. Sessions from before it existed came from OAuth. */
+export function readSessionSource(request: NextRequest): SessionSource {
+  return request.cookies.get(SESSION_SOURCE_COOKIE)?.value === "key" ? "key" : "oauth";
 }
 
-export function clearSessionCookie(response: NextResponse, secure: boolean): void {
-  response.cookies.set(SESSION_COOKIE, "", {
-    httpOnly: true,
-    secure,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 0,
-    expires: new Date(0),
-  });
+/** Sets the session and its source together, with the same attributes and lifetime. */
+export function setSessionCookies(
+  response: NextResponse,
+  token: string,
+  source: SessionSource,
+  secure: boolean,
+): void {
+  const options = { httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: SESSION_COOKIE_MAX_AGE } as const;
+  response.cookies.set(SESSION_COOKIE, token, options);
+  response.cookies.set(SESSION_SOURCE_COOKIE, source, options);
+}
+
+export function clearSessionCookies(response: NextResponse, secure: boolean): void {
+  const options = { httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: 0, expires: new Date(0) } as const;
+  response.cookies.set(SESSION_COOKIE, "", options);
+  response.cookies.set(SESSION_SOURCE_COOKIE, "", options);
 }
 
 type PendingSignIn = { state: string; codeVerifier: string };

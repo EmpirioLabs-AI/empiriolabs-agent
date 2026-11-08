@@ -7,10 +7,11 @@ import {
   clearSignInCookie,
   notFoundResponse,
   readPendingSignIn,
+  readSessionSource,
   readSessionToken,
   redirectToChat,
   SESSION_COOKIE,
-  setSessionCookie,
+  setSessionCookies,
   stateMatches,
 } from "@/lib/session";
 import type { SignInOutcome } from "@/lib/sign-in";
@@ -71,10 +72,13 @@ export async function GET(request: NextRequest): Promise<Response> {
 
   // Signing in again replaces the earlier sign-in in this browser, and its
   // connection is revoked so it does not stay behind in the visitor's account.
+  // An API key the visitor entered earlier is only forgotten, never revoked.
   const previous = readSessionToken(request.cookies.get(SESSION_COOKIE)?.value);
-  if (previous && previous !== result.accessToken) after(() => revokeToken(previous, origin));
+  if (previous && previous !== result.accessToken && readSessionSource(request) === "oauth") {
+    after(() => revokeToken(previous, origin));
+  }
 
   const response = redirectToChat();
-  setSessionCookie(response, result.accessToken, origin.secure);
+  setSessionCookies(response, result.accessToken, "oauth", origin.secure);
   return finish(response);
 }

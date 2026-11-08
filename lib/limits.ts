@@ -17,7 +17,7 @@ export const LIMITS = {
   maxSteps: 10,
   /**
    * Chat requests allowed per client IP address in each window, per server
-   * instance. Sign-in returns and sign-outs are counted apart, with the same limit.
+   * instance. Sign-in returns, API key checks and sign-outs are counted apart, with the same limit.
    */
   rateLimitRequests: 20,
   rateLimitWindowMs: 60_000,

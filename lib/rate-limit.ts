@@ -16,9 +16,9 @@ export function clientAddress(request: Request): string {
 }
 
 /**
- * Counts a chat request from `address`, or a sign-in return or sign-out when
- * the address has the `auth:` prefix. Returns 0 when it may proceed, or the
- * number of seconds to wait before the next one is allowed.
+ * Counts a chat request from `address`, or a sign-in return, an API key check
+ * or a sign-out when the address has the `auth:` prefix. Returns 0 when it
+ * may proceed, or the number of seconds to wait before the next one is allowed.
  */
 export function takeRateLimit(address: string, now = Date.now()): number {
   const windowStart = now - LIMITS.rateLimitWindowMs;

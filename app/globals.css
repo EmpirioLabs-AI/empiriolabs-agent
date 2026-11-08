@@ -419,6 +419,84 @@ pre {
   text-wrap: balance;
 }
 
+/* Use an API key: a quiet button, then a form in place */
+
+.api-key-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.api-key-option--after-alert {
+  align-items: flex-start;
+  margin-top: 12px;
+}
+
+.key-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 360px;
+  text-align: left;
+}
+
+.key-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.key-form__hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.field-label {
+  color: var(--text-strong);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.text-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text-strong);
+  /* 16px keeps phones from zooming into the field. */
+  font-size: 16px;
+}
+
+.text-input::placeholder {
+  color: var(--text-faint);
+}
+
+.text-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.text-input[aria-invalid="true"] {
+  border-color: var(--danger-text);
+}
+
+.field-error {
+  margin: 0;
+  color: var(--danger-text);
+  font-size: 13px;
+}
+
+.key-form .button[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: default;
+}
+
 /* Messages */
 
 .messages {
@@ -1085,6 +1163,17 @@ pre {
   text-underline-offset: 2px;
 }
 
+.link-button--quiet {
+  color: var(--text-muted);
+  font-size: 13.5px;
+}
+
+@media (hover: hover) {
+  .link-button--quiet:hover {
+    color: var(--text-strong);
+  }
+}
+
 .icon-button {
   display: inline-grid;
   place-items: center;
@@ -1358,15 +1447,22 @@ pre {
   .icon-button,
   .message-action,
   .send-button,
-  .button--small {
+  .button--small,
+  .link-button--quiet {
     position: relative;
+  }
+
+  .key-form .button,
+  .text-input {
+    height: 44px;
   }
 
   .header-button::after,
   .icon-button::after,
   .message-action::after,
   .send-button::after,
-  .button--small::after {
+  .button--small::after,
+  .link-button--quiet::after {
     content: "";
     position: absolute;
     top: 50%;

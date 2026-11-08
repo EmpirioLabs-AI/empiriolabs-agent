@@ -2,10 +2,8 @@
 
 An AI agent for [EmpirioLabs AI](https://empiriolabs.ai), built with Next.js and the AI SDK. Chat with any model in the live EmpirioLabs AI catalog, and let the agent use every EmpirioLabs AI tool: generate images, video, 3D assets, speech and music, transcribe audio, read documents, search the web, compare models, run agent tasks and more. The tools come from the live tool list of the EmpirioLabs AI MCP server, so new tools appear without a code change.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FEmpirioLabs-AI%2Fempiriolabs-agent&project-name=empiriolabs-agent&repository-name=empiriolabs-agent&demo-title=EmpirioLabs%20AI%20Agent&demo-description=An%20AI%20agent%20that%20chats%20with%20EmpirioLabs%20AI%20models%20and%20uses%20every%20EmpirioLabs%20AI%20tool%20through%20MCP.&demo-url=https%3A%2F%2Fempiriolabs-agent.vercel.app&demo-image=https%3A%2F%2Fraw.githubusercontent.com%2FEmpirioLabs-AI%2Fempiriolabs-agent%2Fmain%2F.github%2Fscreenshots%2Fdesktop.png&integration-ids=oac_G0yRAQMkKnlHKtLYN9aNXLSD&skippable-integrations=1)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FEmpirioLabs-AI%2Fempiriolabs-agent&project-name=empiriolabs-agent&repository-name=empiriolabs-agent&integration-ids=oac_G0yRAQMkKnlHKtLYN9aNXLSD&skippable-integrations=1)
 [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/empiriolabs-ai-chatbot?referralCode=FR-gwI&utm_medium=integration&utm_source=template&utm_campaign=generic)
-
-**[Live demo](https://empiriolabs-agent.vercel.app)**: sign in with your EmpirioLabs AI account to try it.
 
 <p>
   <img src=".github/screenshots/desktop.png" alt="EmpirioLabs AI Agent on a desktop screen: GLM 5.3 Flash used the Generate an image tool and shows a watercolor painting of a lighthouse at sunrise" width="70%">
@@ -18,8 +16,8 @@ An AI agent for [EmpirioLabs AI](https://empiriolabs.ai), built with Next.js and
 - **Media in the chat.** Images, video and audio that a tool creates appear in the reply. Each tool call shows as a line, such as **Used** Generate an image, that opens to its input and result.
 - **Live model list.** The model picker reads the EmpirioLabs AI catalog when the page loads and lists its text models by author, so new models appear without a code change. Models that do not call tools are marked "chat only" and answer as a plain chat.
 - **Streaming replies.** Replies stream in as Markdown with lists, tables and code blocks. When a model returns its reasoning, it appears in a section you can expand.
-- **Sign in with EmpirioLabs AI.** Without a key of its own, the app asks each visitor to sign in with their EmpirioLabs AI account, and their usage is billed to their account. Visitors never copy an API key.
-- **Keys stay on the server.** `EMPIRIOLABS_API_KEY` is read only on the server and is never sent to the browser. In sign-in mode, the visitor's access token is kept in an HttpOnly cookie that the page's scripts cannot read.
+- **Sign in with EmpirioLabs AI.** Without a key of its own, the app asks each visitor to sign in with their EmpirioLabs AI account, and their usage is billed to their account. Visitors can also continue with an API key of their own.
+- **Keys stay on the server.** `EMPIRIOLABS_API_KEY` is read only on the server and is never sent to the browser. In sign-in mode, the visitor's access token, or the API key they entered, is kept in an HttpOnly cookie that the page's scripts cannot read.
 - **Ready for every screen.** Light and dark themes follow the system setting, the layout works from phones to wide screens, and every control has an accessible label and works from the keyboard.
 - **No analytics or tracking.**
 
@@ -82,6 +80,7 @@ The agent connects to the [EmpirioLabs AI MCP server](https://docs.empiriolabs.a
 - The visitor approves the app on the EmpirioLabs AI consent screen (OAuth 2.1 with PKCE), and the app receives an access token for their account. Their chats and tool calls are billed to their account, at the same prices and limits as the API.
 - The app keeps the access token in an HttpOnly cookie for 30 days. The page's scripts cannot read it, and only the app's server uses it. **Sign Out** revokes it.
 - Visitors can disconnect the app at any time under **Settings > Connected applications** in the EmpirioLabs AI dashboard.
+- Visitors can also select **Use an API key** under **Sign In** and continue with an API key of their own. The app checks the key with one read-only request, keeps it only in the same HttpOnly cookie, and never revokes it: **Sign Out** removes it from the browser, and the key keeps working everywhere else.
 - The app identifies itself with a client metadata document at `/oauth/client.json`, and that URL is its client ID, so there is nothing to register. EmpirioLabs AI reads the document over https, so sign-in works at an https address anyone can open, such as your production domain, and not at a deployment behind a login, such as a Vercel preview deployment with Deployment Protection.
 
 More in the [sign-in guide](https://docs.empiriolabs.ai/oauth).
@@ -94,8 +93,8 @@ With `EMPIRIOLABS_API_KEY` set, anyone who can open your deployment can use that
 
 Every deployment also applies these limits, which you can change in [`lib/limits.ts`](lib/limits.ts):
 
-- Chat and sign-out requests sent from other websites are refused.
-- Each IP address can send 20 chat requests a minute, and complete 20 sign-ins or sign-outs a minute, counted on each server instance.
+- Chat, API key and sign-out requests sent from other websites are refused.
+- Each IP address can send 20 chat requests a minute, and 20 sign-in, API key and sign-out requests a minute, counted on each server instance.
 - A message can be up to 32,000 characters, a conversation up to 100 messages or 200,000 characters, and a request body up to 1 MB.
 - A reply can make up to 10 model calls, with tool calls between them, and can run for up to 5 minutes. Each model call can write up to 16,384 tokens, or the model's own maximum when that is lower.
 - Only models in the catalog list can be used, and a failed reply is sent again only when the visitor selects **Try Again**.
@@ -107,10 +106,11 @@ Every deployment also applies these limits, which you can change in [`lib/limits
 | `app/api/chat/route.ts` | Checks each request, picks the key (the visitor's access token in sign-in mode, otherwise `EMPIRIOLABS_API_KEY`), loads the tools, and streams the reply with `streamText`, which can call tools for up to 10 steps. Closes the MCP connection when the reply ends. |
 | `app/api/auth/login/route.ts` | Starts sign-in: creates the `state` and the PKCE verifier, keeps them in a short-lived HttpOnly cookie, and sends the visitor to the EmpirioLabs AI consent screen. |
 | `app/api/auth/callback/route.ts` | Checks the `state`, exchanges the code for the visitor's access token on the server, and keeps the token in an HttpOnly cookie. |
-| `app/api/auth/logout/route.ts` | Revokes the visitor's access token and clears the cookie. |
+| `app/api/auth/key/route.ts` | Continues with an API key: checks its shape, checks it with one read-only request (`GET /v1/account/usage`), then keeps it in the same HttpOnly cookie as a sign-in. |
+| `app/api/auth/logout/route.ts` | Revokes an access token from signing in, never an API key the visitor entered, and clears the cookies. |
 | `app/oauth/client.json/route.ts` | The app's client metadata document. Its URL is the app's OAuth client ID. |
 | `lib/oauth.ts` | The EmpirioLabs AI OAuth endpoints, the client metadata, PKCE, the code exchange and revocation. |
-| `lib/session.ts` | The sign-in cookies, and the visitor's access token for the chat route. |
+| `lib/session.ts` | The sign-in cookies, including whether the visitor signed in or entered an API key, and the visitor's token or key for the chat route. |
 | `lib/origin.ts` | The app's public address for sign-in: `APP_URL`, or the address each request arrives at. |
 | `lib/mcp.ts` | Connects to the EmpirioLabs AI MCP server with the API key that serves the request, reads its live tool list, and turns each tool result into text for the model and files for the page. |
 | `lib/instructions.ts` | The agent's instructions, followed by the MCP server's own notes on its tools. |
@@ -118,6 +118,7 @@ Every deployment also applies these limits, which you can change in [`lib/limits
 | `lib/tool-output.ts` | The shape of a tool result, and the check that shows media only from `https://media.empiriolabs.ai`. |
 | `components/tool-call.tsx` | Shows each tool call, and the images, video and audio it made. |
 | `components/chat.tsx` | The chat interface, built on `useChat` from `@ai-sdk/react`, with **Sign In** and **Sign Out** in sign-in mode. |
+| `components/api-key-option.tsx` | **Use an API key**: the form under **Sign In** for a visitor who continues with a key. |
 | `components/chat-loader.tsx` | Loads the model list, the settings and whether the visitor is signed in, on the server for each request. |
 | `lib/empiriolabs.ts` | Creates the EmpirioLabs AI provider and turns API errors into messages for the page. |
 

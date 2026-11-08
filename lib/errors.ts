@@ -9,7 +9,7 @@ const MESSAGES = {
   server_credits: "The EmpirioLabs AI account behind this app is out of credits.",
   account_credits: "Your EmpirioLabs AI account is out of credits. Add credits, then try again.",
   server_key_limit: "The app's API key has reached its spending limit.",
-  account_limit: "Your EmpirioLabs AI account has reached a spending limit.",
+  account_limit: "Your API key has reached its spending limit. Raise the limit or use another key, then try again.",
   model_forbidden:
     "This account cannot use the selected model. Choose another model, or contact EmpirioLabs AI support if this continues.",
   model_unavailable: "The selected model is not available. Choose another model.",

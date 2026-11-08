@@ -6,17 +6,20 @@ import { revokeToken } from "@/lib/oauth";
 import { appOrigin } from "@/lib/origin";
 import { clientAddress, takeRateLimit } from "@/lib/rate-limit";
 import {
-  clearSessionCookie,
+  clearSessionCookies,
   emptyResponse,
   jsonResponse,
+  readSessionSource,
   readSessionToken,
   SESSION_COOKIE,
 } from "@/lib/session";
 
 /**
- * Signs the visitor out: revokes their access token, which disconnects the app
- * from their EmpirioLabs AI account, and clears the session cookie. Answers
- * 204. Revocation is best effort; the cookie is cleared either way.
+ * Signs the visitor out and clears the session cookies. An access token from
+ * signing in is revoked first, which disconnects the app from the visitor's
+ * EmpirioLabs AI account; revocation is best effort, and the cookies are
+ * cleared either way. An API key the visitor entered is only forgotten: it is
+ * never sent to the revocation endpoint. Answers 204.
  */
 export async function POST(request: NextRequest): Promise<Response> {
   if (isCrossSite(request)) return jsonResponse(chatError("cross_site"), 403);
@@ -29,9 +32,9 @@ export async function POST(request: NextRequest): Promise<Response> {
   // sign-in mode), the token is revoked on its own.
   const origin = getServerConfig().signInMode ? appOrigin(request) : null;
   const token = readSessionToken(request.cookies.get(SESSION_COOKIE)?.value);
-  if (token) await revokeToken(token, origin);
+  if (token && readSessionSource(request) === "oauth") await revokeToken(token, origin);
 
   const response = emptyResponse(204);
-  clearSessionCookie(response, origin?.secure ?? false);
+  clearSessionCookies(response, origin?.secure ?? false);
   return response;
 }

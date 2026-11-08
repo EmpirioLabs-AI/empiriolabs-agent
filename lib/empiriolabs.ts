@@ -14,6 +14,33 @@ export function createEmpirioLabs(apiKey: string) {
   });
 }
 
+const KEY_CHECK_TIMEOUT_MS = 10_000;
+
+/**
+ * Checks an API key a visitor entered with one read-only request: the
+ * account's usage, which answers even when the account has no credits. 401 or
+ * 403 means the key is not accepted. The answer's body is never read, and the
+ * key is never logged.
+ */
+export async function checkApiKey(apiKey: string): Promise<"valid" | "invalid" | "unavailable"> {
+  try {
+    const response = await fetch(`${EMPIRIOLABS_API_URL}/account/usage?limit=1`, {
+      headers: { authorization: `Bearer ${apiKey}`, accept: "application/json" },
+      cache: "no-store",
+      redirect: "error",
+      signal: AbortSignal.timeout(KEY_CHECK_TIMEOUT_MS),
+    });
+    await response.body?.cancel().catch(() => undefined);
+    if (response.ok) return "valid";
+    if (response.status === 401 || response.status === 403) return "invalid";
+    console.error("API key check failed:", JSON.stringify({ status: response.status }));
+    return "unavailable";
+  } catch (error) {
+    console.error("API key check failed:", JSON.stringify({ error: error instanceof Error ? error.name : "unknown" }));
+    return "unavailable";
+  }
+}
+
 type ApiFailure = {
   status?: number;
   code?: string;
@@ -56,8 +83,9 @@ export function logApiFailure(error: unknown, model: string): void {
 
 /**
  * Maps an error from the EmpirioLabs AI API to what the visitor sees.
- * `signedIn` is true when the request used the visitor's own access token: a
- * 401 then means the visitor disconnected the app, or the token was revoked.
+ * `signedIn` is true when the request used the visitor's own access token or
+ * API key: a 401 then means the visitor disconnected the app, or the token or
+ * key no longer works.
  */
 export function describeApiError(error: unknown, signedIn: boolean): ChatErrorCode {
   const { status, code } = readFailure(error);
