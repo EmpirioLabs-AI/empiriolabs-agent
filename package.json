@@ -5,13 +5,13 @@
   "description": "An AI agent built with Next.js, the AI SDK and EmpirioLabs AI: chat with any model and use every EmpirioLabs AI tool.",
   "license": "MIT",
   "author": "EmpirioLabs AI <support@empiriolabs.ai> (https://empiriolabs.ai)",
-  "homepage": "https://github.com/EmpirioLabs-AI/empiriolabs-chatbot#readme",
+  "homepage": "https://github.com/EmpirioLabs-AI/empiriolabs-agent#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/EmpirioLabs-AI/empiriolabs-chatbot.git"
+    "url": "git+https://github.com/EmpirioLabs-AI/empiriolabs-agent.git"
   },
   "bugs": {
-    "url": "https://github.com/EmpirioLabs-AI/empiriolabs-chatbot/issues"
+    "url": "https://github.com/EmpirioLabs-AI/empiriolabs-agent/issues"
   },
   "engines": {
     "node": "24.x"
