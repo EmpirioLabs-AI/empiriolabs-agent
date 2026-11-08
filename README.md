@@ -80,7 +80,7 @@ The agent connects to the [EmpirioLabs AI MCP server](https://docs.empiriolabs.a
 **Sign-in mode is the recommended way to share a deployment.** Leave `EMPIRIOLABS_API_KEY` unset, and each visitor signs in with their own EmpirioLabs AI account:
 
 - The visitor approves the app on the EmpirioLabs AI consent screen (OAuth 2.1 with PKCE), and the app receives an access token for their account. Their chats and tool calls are billed to their account, at the same prices and limits as the API.
-- The app keeps the access token in an HttpOnly cookie for the browser session. The page's scripts cannot read it, and only the app's server uses it. **Sign Out** revokes it.
+- The app keeps the access token in an HttpOnly cookie for 30 days. The page's scripts cannot read it, and only the app's server uses it. **Sign Out** revokes it.
 - Visitors can disconnect the app at any time under **Settings > Connected applications** in the EmpirioLabs AI dashboard.
 - The app identifies itself with a client metadata document at `/oauth/client.json`, and that URL is its client ID, so there is nothing to register. EmpirioLabs AI reads the document over https, so sign-in works at an https address anyone can open, such as your production domain, and not at a deployment behind a login, such as a Vercel preview deployment with Deployment Protection.
 
@@ -106,7 +106,7 @@ Every deployment also applies these limits, which you can change in [`lib/limits
 | --- | --- |
 | `app/api/chat/route.ts` | Checks each request, picks the key (the visitor's access token in sign-in mode, otherwise `EMPIRIOLABS_API_KEY`), loads the tools, and streams the reply with `streamText`, which can call tools for up to 10 steps. Closes the MCP connection when the reply ends. |
 | `app/api/auth/login/route.ts` | Starts sign-in: creates the `state` and the PKCE verifier, keeps them in a short-lived HttpOnly cookie, and sends the visitor to the EmpirioLabs AI consent screen. |
-| `app/api/auth/callback/route.ts` | Checks the `state`, exchanges the code for the visitor's access token on the server, and keeps the token in an HttpOnly session cookie. |
+| `app/api/auth/callback/route.ts` | Checks the `state`, exchanges the code for the visitor's access token on the server, and keeps the token in an HttpOnly cookie. |
 | `app/api/auth/logout/route.ts` | Revokes the visitor's access token and clears the cookie. |
 | `app/oauth/client.json/route.ts` | The app's client metadata document. Its URL is the app's OAuth client ID. |
 | `lib/oauth.ts` | The EmpirioLabs AI OAuth endpoints, the client metadata, PKCE, the code exchange and revocation. |

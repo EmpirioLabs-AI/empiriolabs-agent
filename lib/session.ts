@@ -6,11 +6,13 @@ import { SIGN_IN_PARAM, type SignInOutcome } from "./sign-in";
 
 /**
  * The visitor's access token, after they sign in. HttpOnly, so the page's
- * scripts cannot read it, and a session cookie with no expiry date, so the
- * browser keeps it for its current session only. Only the server reads it, to
+ * scripts cannot read it, and kept for 30 days, so a returning visitor uses the
+ * same connection instead of adding a new one under Settings > Connected
+ * applications each time. Sign Out revokes it. Only the server reads it, to
  * call EmpirioLabs AI for the visitor.
  */
 export const SESSION_COOKIE = "empiriolabs_session";
+const SESSION_COOKIE_MAX_AGE = 30 * 24 * 60 * 60;
 
 /** The `state` and PKCE `code_verifier` of a sign-in in progress, sent only to the sign-in routes for ten minutes. */
 const SIGN_IN_COOKIE = "empiriolabs_sign_in";
@@ -26,7 +28,13 @@ export function readSessionToken(value: string | undefined): string | null {
 }
 
 export function setSessionCookie(response: NextResponse, token: string, secure: boolean): void {
-  response.cookies.set(SESSION_COOKIE, token, { httpOnly: true, secure, sameSite: "lax", path: "/" });
+  response.cookies.set(SESSION_COOKIE, token, {
+    httpOnly: true,
+    secure,
+    sameSite: "lax",
+    path: "/",
+    maxAge: SESSION_COOKIE_MAX_AGE,
+  });
 }
 
 export function clearSessionCookie(response: NextResponse, secure: boolean): void {
