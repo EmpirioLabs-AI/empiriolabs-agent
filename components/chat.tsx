@@ -163,8 +163,9 @@ export function Chat({
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Nothing to follow before the first message: the welcome screen stays at the top.
   useEffect(() => {
-    if (followReply.current) window.scrollTo({ top: document.documentElement.scrollHeight });
+    if (followReply.current && messages.length > 0) window.scrollTo({ top: document.documentElement.scrollHeight });
   }, [messages, status, shownError]);
 
   // The message box is the one primary input: focus it on desktop, not on touch screens.
